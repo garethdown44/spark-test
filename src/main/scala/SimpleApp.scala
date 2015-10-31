@@ -12,7 +12,7 @@ object Mappers {
 
         val splitted = s.split(",")
         val price = splitted(1).replace("\"", "").toDouble
-        val year = splitted(2).substring(0, 4).toInt
+        val year = splitted(2).replace("\"", "").substring(0, 4).toInt
         val postcodePrefix = splitted(3).replace("\"", "").split(" ")(0)
 
         return ( (year, postcodePrefix), price)
@@ -22,6 +22,10 @@ object Mappers {
 
     //     return 
     // }
+
+    def calcPercent(a: Double, b: Double) : Double = {
+        return ((b - a) / a) * 100
+    }
 }
 
 import org.apache.log4j.Logger
@@ -39,7 +43,7 @@ object SimpleApp {
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("akka").setLevel(Level.WARN)
 
-    val housePrices = sc.textFile("./example2.txt").cache
+    val housePrices = sc.textFile("/Users/garethd/Desktop/DATA/pp-complete.csv").cache
 
     val prices = housePrices.map(Mappers.toYearsPricesAndPostcodes)
     val count = prices.count
@@ -51,26 +55,35 @@ object SimpleApp {
     val mapped = averagePrices.map{ case ((y,p), pr) => (p, (y,pr)) } // ((1995, CB11), 100000) --> (CB11, (1995, 100000))
 
     println("mapped has these items")
-    mapped.foreach(println)
+    //mapped.foreach(println)
+
+    mapped.coalesce(1,true).saveAsTextFile("./mapped.txt")
 
     val firsts = mapped.map{ case (p, (y,pr)) => (p, y % 1995) -> (y, pr)}
     val seconds = mapped.map{ case (p, (y,pr)) => (p, y % 1996) -> (y, pr)}
 
-    println("firsts")
-    firsts.foreach(println)
+    //println("firsts")
+    //firsts.foreach(println)
 
-    println("seconds")
-    seconds.foreach(println)
+    //println("seconds")
+    //seconds.foreach(println)
 
-    println("joined")
+    //println("joined")
     val joined = firsts.join(seconds)
 
-    joined.foreach(println)
+    joined.coalesce(1,true).saveAsTextFile("./joined.txt")
 
-    val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, (pr1 / pr2)*100) }
+    //joined.foreach(println)
+
+    val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, pr1, pr2, Mappers.calcPercent(pr1, pr2) ) }
 
     println("percent increase:")
-    percentIncrease.foreach(println)
+    //percentIncrease.foreach(println)
+
+    val finalValues = percentIncrease.coalesce(1,true)
+
+    finalValues.saveAsTextFile("./output.txt")
+
 
     // a -> 1, 100
     // a -> 2, 200
