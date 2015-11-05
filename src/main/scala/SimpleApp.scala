@@ -2,10 +2,8 @@
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
-
-// {F5607606-D500-455B-9CCC-01CB6FFB4567},572000,2015-07-10 00:00,"LA8 9LP","D","N","F","FELL CLOSE HOUSE","","KENDAL ROAD","STAVELEY","KENDAL","SOUTH LAKELAND","CUMBRIA","A","A"
-// "AB101AA",10,394251,806376,"S92000003","","S08000020","","S12000033","S13002483"
-// 
+import org.apache.log4j.Logger
+import org.apache.log4j.Level
 
 object Mappers {
     def toYearsPricesAndPostcodes(s: String) : ( (Int, String), Double) = {
@@ -18,18 +16,10 @@ object Mappers {
         return ( (year, postcodePrefix), price)
     }
 
-    // def toAveragesPerPostcodePerYear(tuple : ( (Int, String), Long) ) = {
-
-    //     return 
-    // }
-
     def calcPercent(a: Double, b: Double) : Double = {
         return ((b - a) / a) * 100
     }
 }
-
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
 
 object SimpleApp {
   def main(args: Array[String]) {
@@ -55,66 +45,23 @@ object SimpleApp {
     val mapped = averagePrices.map{ case ((y,p), pr) => (p, (y,pr)) } // ((1995, CB11), 100000) --> (CB11, (1995, 100000))
 
     println("mapped has these items")
-    //mapped.foreach(println)
 
     mapped.coalesce(1,true).saveAsTextFile("./mapped.txt")
 
     val firsts = mapped.map{ case (p, (y,pr)) => (p, y % 1995) -> (y, pr)}
     val seconds = mapped.map{ case (p, (y,pr)) => (p, y % 1996) -> (y, pr)}
 
-    //println("firsts")
-    //firsts.foreach(println)
-
-    //println("seconds")
-    //seconds.foreach(println)
-
-    //println("joined")
     val joined = firsts.join(seconds)
 
     joined.coalesce(1,true).saveAsTextFile("./joined.txt")
 
-    //joined.foreach(println)
-
     val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, pr1, pr2, Mappers.calcPercent(pr1, pr2) ) }
 
     println("percent increase:")
-    //percentIncrease.foreach(println)
 
     val finalValues = percentIncrease.coalesce(1,true)
 
     finalValues.saveAsTextFile("./output.txt")
-
-
-    // a -> 1, 100
-    // a -> 2, 200
-    // a -> 3, 250
-
-    // b -> 1, 300
-    // b -> 2, 350
-
-    // c -> 1, 400
-
-    // mod the year by either the start year or the next year to get the same indeces
-
-    // map ->
-    //
-    // (a,0) -> 1,100
-    // and 
-    // (a,0) -> 2,200
-
-    // then join them and map back out
-
-    // (a,2) -> (100,200)
-    // (a,3) -> (200,250)
-
-    // map values again to get percentage increase
-
-
-    // within each group we want to zip
-
-    // a -> ( (1, 100), (2, 200) )
-    // a -> ( (2, 200), (3, 250) )
-
 
     sc.stop
   }
