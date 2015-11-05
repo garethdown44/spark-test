@@ -1,25 +1,8 @@
-/* SimpleApp.scala */
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
-
-object Mappers {
-    def toYearsPricesAndPostcodes(s: String) : ( (Int, String), Double) = {
-
-        val splitted = s.split(",")
-        val price = splitted(1).replace("\"", "").toDouble
-        val year = splitted(2).replace("\"", "").substring(0, 4).toInt
-        val postcodePrefix = splitted(3).replace("\"", "").split(" ")(0)
-
-        return ( (year, postcodePrefix), price)
-    }
-
-    def calcPercent(a: Double, b: Double) : Double = {
-        return ((b - a) / a) * 100
-    }
-}
 
 object SimpleApp {
   def main(args: Array[String]) {
@@ -35,7 +18,7 @@ object SimpleApp {
 
     val housePrices = sc.textFile("/Users/garethd/Desktop/DATA/pp-complete.csv").cache
 
-    val prices = housePrices.map(Mappers.toYearsPricesAndPostcodes)
+    val prices = housePrices.map(toYearsPricesAndPostcodes)
     val count = prices.count
 
     val totalPricesTotalCounts = prices.mapValues(x => (x, 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
@@ -55,7 +38,7 @@ object SimpleApp {
 
     joined.coalesce(1,true).saveAsTextFile("./joined.txt")
 
-    val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, pr1, pr2, Mappers.calcPercent(pr1, pr2) ) }
+    val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, pr1, pr2, calcPercent(pr1, pr2) ) }
 
     println("percent increase:")
 
@@ -65,4 +48,18 @@ object SimpleApp {
 
     sc.stop
   }
+
+  def toYearsPricesAndPostcodes(s: String) : ( (Int, String), Double) = {
+
+        val splitted = s.split(",")
+        val price = splitted(1).replace("\"", "").toDouble
+        val year = splitted(2).replace("\"", "").substring(0, 4).toInt
+        val postcodePrefix = splitted(3).replace("\"", "").split(" ")(0)
+
+        return ( (year, postcodePrefix), price)
+    }
+
+    def calcPercent(a: Double, b: Double) : Double = {
+        return ((b - a) / a) * 100
+    }
 }
