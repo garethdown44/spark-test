@@ -16,35 +16,48 @@ object SimpleApp {
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("akka").setLevel(Level.WARN)
 
-    val housePrices = sc.textFile("/Users/garethd/Desktop/DATA/pp-complete.csv").cache
+    val housePrices = sc.textFile("file:///d:/pp-complete.csv").cache
 
     val prices = housePrices.map(toYearsPricesAndPostcodes)
-    val count = prices.count
 
-    val totalPricesTotalCounts = prices.mapValues(x => (x, 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
+    val filtered = prices.filter{ case ( (y, pc), pr) => pc.startsWith("CB11 4S") }
 
-    val averagePrices = totalPricesTotalCounts.mapValues(x => x._1 / x._2)
+    val mapped = filtered.map{ case ( (y, pc), pr) => Array(pc, y, pr).mkString(",") }
 
-    val mapped = averagePrices.map{ case ((y,p), pr) => (p, (y,pr)) } // ((1995, CB11), 100000) --> (CB11, (1995, 100000))
+    mapped.coalesce(1, true).saveAsTextFile("output")
 
-    println("mapped has these items")
+    //val count = prices.count
 
-    mapped.coalesce(1,true).saveAsTextFile("./mapped.txt")
+    // val totalPricesTotalCounts = prices.mapValues(x => (x, 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
 
-    val firsts = mapped.map{ case (p, (y,pr)) => (p, y % 1995) -> (y, pr)}
-    val seconds = mapped.map{ case (p, (y,pr)) => (p, y % 1996) -> (y, pr)}
+    // val averagePrices = totalPricesTotalCounts.mapValues(x => x._1 / x._2)
 
-    val joined = firsts.join(seconds)
+    // val mapped = averagePrices.map{ case ((y,p), pr) => (p, (y,pr)) } // ((1995, CB11), 100000) --> (CB11, (1995, 100000))
 
-    joined.coalesce(1,true).saveAsTextFile("./joined.txt")
+    // println("mapped has these items")
 
-    val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, pr1, pr2, calcPercent(pr1, pr2) ) }
+    // //mapped.coalesce(1,true).saveAsTextFile("./mapped.txt")
 
-    println("percent increase:")
+    // val firsts = mapped.map{ case (p, (y,pr)) => (p, y % 1995) -> (y, pr)}
+    // val seconds = mapped.map{ case (p, (y,pr)) => (p, y % 1996) -> (y, pr)}
 
-    val finalValues = percentIncrease.coalesce(1,true)
+    // val joined = firsts.join(seconds)
 
-    finalValues.saveAsTextFile("./output.txt")
+    // //joined.coalesce(1,true).saveAsTextFile("./joined.txt")
+
+    // val percentIncrease = joined.map{ case ( (p,i), ((y1,pr1), (y2,pr2))) => p -> (y2, pr1, pr2, calcPercent(pr1, pr2) ) }
+
+    // // val filtered = percentIncrease.filter{ case (p, (y2, pr1, pr2, percent)) => p == "CB11" && y2 == 2014 }
+
+    // println("percent increase:")
+
+    // //val finalValues = percentIncrease.coalesce(1,true)
+
+    // //finalValues.saveAsTextFile("./output.txt")
+
+    // val csvValues = filtered.map{ case (p, (y2, pr1, pr2, percent)) => Array(p, y2, pr1, pr2, percent).mkString(",") }
+
+    // csvValues.coalesce(1, true).saveAsTextFile("output")
 
     sc.stop
   }
@@ -54,9 +67,13 @@ object SimpleApp {
         val splitted = s.split(",")
         val price = splitted(1).replace("\"", "").toDouble
         val year = splitted(2).replace("\"", "").substring(0, 4).toInt
-        val postcodePrefix = splitted(3).replace("\"", "").split(" ")(0)
 
-        return ( (year, postcodePrefix), price)
+        val postcode = splitted(3).replace("\"", "")
+        //val postcodePrefix = splitPostcode(0) + splitPostcode(1).substring(1)
+
+        //val postcodePrefixPlusOne = 
+
+        return ( (year, postcode), price)
     }
 
     def calcPercent(a: Double, b: Double) : Double = {
