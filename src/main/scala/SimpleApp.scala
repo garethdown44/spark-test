@@ -7,24 +7,64 @@ import org.apache.log4j.Level
 object SimpleApp {
   def main(args: Array[String]) {
 
+    Logger.getLogger("org").setLevel(Level.WARN)
+    Logger.getLogger("akka").setLevel(Level.WARN)
+
     val conf = new SparkConf().setAppName("Simple Application")
     val sc = new SparkContext(conf)
 
     //val postcodes = sc.textFile("file:///d:/codepo_gb/Data/CSV/*.csv")
     //val housePrices = sc.textFile("file:///d:/pp-2015.txt").cache
 
-    Logger.getLogger("org").setLevel(Level.WARN)
-    Logger.getLogger("akka").setLevel(Level.WARN)
-
-    val housePrices = sc.textFile("file:///d:/pp-complete.csv").cache
+    val housePrices = sc.textFile("./example3.txt").cache
 
     val prices = housePrices.map(toYearsPricesAndPostcodes)
 
-    val filtered = prices.filter{ case ( (y, pc), pr) => pc.startsWith("CB11 4S") }
+    //val mapped = prices.map{ case ( (y, pc), pr) => Array(pc, y, pr).mkString(",") }
+    //mapped.coalesce(1, true).saveAsTextFile("output")
 
-    val mapped = filtered.map{ case ( (y, pc), pr) => Array(pc, y, pr).mkString(",") }
+    val meanOfX = prices.map(x => x._1._1.toDouble).reduce((x, y) => x + y) / prices.count
+    val meanOfY = prices.map(x => x._2).reduce((x, y) => x + y) / prices.count
+    val meanOfXYs = prices.map(x => x._1._1 * x._2).reduce((x, y) => x + y) / prices.count
+    val meanOfXSquared = prices.map(x => Math.pow(x._1._1, 2)).reduce((x, y) => x + y) / prices.count
 
-    mapped.coalesce(1, true).saveAsTextFile("output")
+    println("mean of x")
+    println(meanOfX)
+
+    println("mean of y")
+    println(meanOfY)
+
+    println("mean of xys")
+    println(f"$meanOfXYs%2.2f")
+
+    println("mean of x squared")
+    println(meanOfXSquared)
+
+    val m = (( (meanOfX * meanOfY) - meanOfXYs)) / ((Math.pow(meanOfX, 2) - meanOfXSquared).toDouble)
+
+    println("m")
+    println(f"$m%2.2f")
+
+    val b = meanOfY - (m * meanOfX)
+
+    val y1995 = (m * 1995) + b
+    println("y 1995")
+    println(y1995)
+
+    val calcY = (mp : Double, x : Double, bp : Double) => (mp * x) + bp
+
+    val range = 1995 until 2015
+
+    val ys = range.map(x => calcY(m, x, b))
+
+    ys.foreach(println)
+
+    //val b = prices.reduce( (a, b) => 1 + b._2)
+
+
+    //println(meanOfX.toString)
+
+    
 
     //val count = prices.count
 
