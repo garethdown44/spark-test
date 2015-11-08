@@ -4,8 +4,30 @@ import org.apache.spark.SparkConf
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 
+//case class PostcodeYearPrice(postcode : String, year : Int, price : Double);
+
 object SimpleApp {
-  def main(args: Array[String]) {
+
+    def calcMandB( vals: (Double, Double, Double, Double) ) : (Double, Double) = {
+
+        vals match { case (mxs, mys, mxys, mx2s) => {
+            val m = (( (mxs * mys) - mxys)) / ((Math.pow(mxs, 2) - mx2s).toDouble)
+            val b = mys - (m * mxs)
+
+            return (m, b)
+        }
+        }
+    }
+
+    def calcYs( p: (Double, Double) )  : Seq[(Int, Double)] = {
+
+        //(p: (Double, Double)) => (m * x) + b
+
+        val range = 1995 until 2016
+        return range.map(x => (x, (p._1 * x) + p._2)) // y = mx + b
+    }
+
+    def main(args: Array[String]) {
 
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("akka").setLevel(Level.WARN)
@@ -23,48 +45,68 @@ object SimpleApp {
     //val mapped = prices.map{ case ( (y, pc), pr) => Array(pc, y, pr).mkString(",") }
     //mapped.coalesce(1, true).saveAsTextFile("output")
 
-    val meanOfX = prices.map(x => x._1._1.toDouble).reduce((x, y) => x + y) / prices.count
-    val meanOfY = prices.map(x => x._2).reduce((x, y) => x + y) / prices.count
-    val meanOfXYs = prices.map(x => x._1._1 * x._2).reduce((x, y) => x + y) / prices.count
-    val meanOfXSquared = prices.map(x => Math.pow(x._1._1, 2)).reduce((x, y) => x + y) / prices.count
+    //prices.mapValues{ case (x: Int, _ : Double) => x.toDouble}.reduceByKey((x, y) => x + y)
+    //val meanOfY = prices.mapValues(x => x._2).reduce((x, y) => x + y) / prices.count
+    // val meanOfXYs = prices.map(x => x._2._1 * x._2._2).reduce((x, y) => x + y) / prices.count
+    // val meanOfXSquared = prices.map(x => Math.pow(x._2._1, 2)).reduce((x, y) => x + y) / prices.count
 
-    println("mean of x")
-    println(meanOfX)
+    // val totalYsTotalCounts = prices.mapValues(x => (x._2, 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
+    // val meanOfYs = totalYsTotalCounts.mapValues(x => x._1 / x._2)
 
-    println("mean of y")
-    println(meanOfY)
+    // val totalXsTotalCounts = prices.mapValues(x => (x._1, 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
+    // val meanOfXs = totalXsTotalCounts.mapValues(x => x._1 / x._2)
 
-    println("mean of xys")
-    println(f"$meanOfXYs%2.2f")
+    // val totalXYsTotalCounts = prices.mapValues(x => (x._1 * x._2, 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
+    // val meanOfXYs = totalXYsTotalCounts.mapValues(x => x._1 / x._2)
 
-    println("mean of x squared")
-    println(meanOfXSquared)
+    // val totalXSquaredsTotalCounts = prices.mapValues(x => (Math.pow(x._1, 2), 1)).reduceByKey( (x, y) => (x._1 + y._1, x._2 + y._2) )
+    // val meanOfXSquareds = totalXSquaredsTotalCounts.mapValues(x => x._1 / x._2)
 
-    val m = (( (meanOfX * meanOfY) - meanOfXYs)) / ((Math.pow(meanOfX, 2) - meanOfXSquared).toDouble)
+    val values = prices.mapValues(x => (x._1, x._2, x._1 * x._2, Math.pow(x._1, 2), 1))
+                       .reduceByKey{ case ((xsa, ysa, xysa, x2sa, na), (xsb, ysb, xysb, x2sb, nb)) => ((xsa + xsb), (ysa + ysb), (xysa + xysb), (x2sa + x2sb), (na + nb)) }
+                       .mapValues{ case (xs, ys, xys, x2s, n) => ( (xs / n).toDouble, ys / n, xys / n, x2s / n) }
+                       .mapValues(calcMandB)
+                       .mapValues(calcYs)
+                       .flatMapValues(x => x)
+                       .map{ case (pc, (y, pr)) => ((pc, y), pr) }
 
-    println("m")
-    println(f"$m%2.2f")
+    values.coalesce(1, true).foreach(println)
 
-    val b = meanOfY - (m * meanOfX)
 
-    val y1995 = (m * 1995) + b
-    println("y 1995")
-    println(y1995)
+    // println("mean of x")
+    // println(meanOfX)
 
-    val calcY = (mp : Double, x : Double, bp : Double) => (mp * x) + bp
+    // println("mean of y")
+    // println(meanOfY)
 
-    val range = 1995 until 2015
+    // println("mean of xys")
+    // println(f"$meanOfXYs%2.2f")
 
-    val ys = range.map(x => calcY(m, x, b))
+    // println("mean of x squared")
+    // println(meanOfXSquared)
 
-    ys.foreach(println)
+    // val m = (( (meanOfX * meanOfY) - meanOfXYs)) / ((Math.pow(meanOfX, 2) - meanOfXSquared).toDouble)
+
+    // println("m")
+    // println(f"$m%2.2f")
+
+    // val b = meanOfY - (m * meanOfX)
+
+    // val y1995 = (m * 1995) + b
+    // println("y 1995")
+    // println(y1995)
+
+    // val calcY = (mp : Double, x : Double, bp : Double) => (mp * x) + bp
+
+    // val range = 1995 until 2015
+
+    // val ys = range.map(x => calcY(m, x, b))
+
+    // ys.foreach(println)
 
     //val b = prices.reduce( (a, b) => 1 + b._2)
 
-
     //println(meanOfX.toString)
-
-    
 
     //val count = prices.count
 
@@ -100,9 +142,9 @@ object SimpleApp {
     // csvValues.coalesce(1, true).saveAsTextFile("output")
 
     sc.stop
-  }
+    }
 
-  def toYearsPricesAndPostcodes(s: String) : ( (Int, String), Double) = {
+  def toYearsPricesAndPostcodes(s: String) : ( String, (Int, Double)) = {
 
         val splitted = s.split(",")
         val price = splitted(1).replace("\"", "").toDouble
@@ -113,7 +155,7 @@ object SimpleApp {
 
         //val postcodePrefixPlusOne = 
 
-        return ( (year, postcode), price)
+        return (postcode, (year, price))
     }
 
     def calcPercent(a: Double, b: Double) : Double = {
