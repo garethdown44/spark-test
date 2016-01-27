@@ -4,10 +4,36 @@ import org.apache.spark.SparkConf
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 
-//case class PostcodeYearPrice(postcode : String, year : Int, price : Double);
+object RepeatSalesRegression {
 
-object SimpleApp {
+    def toAddressPostcodeYearPrice(line: String) : ((String, String), (Int, Double)) = {
 
+        val splitted = line.split(",")
+        val price = splitted(1).replace("\"", "").toDouble
+        val year = splitted(2).replace("\"", "").substring(0, 4).toInt
+
+        val postcode = splitted(3).replace("\"", "")
+        val address = splitted(3) + splitted(7) + splitted(8) + splitted(9) + splitted(10) + splitted(11) + splitted(12) + splitted(13)
+
+        return ((address, postcode), (year, price))
+    }
+
+    def run(records: org.apache.spark.rdd.RDD[String]) {
+        val prices = records.map(toAddressPostcodeYearPrice)
+
+        val values = prices.mapValues(x => (x._1, x._2, x._1 * x._2, Math.pow(x._1, 2), 1)) // same as before
+
+        values.coalesce(1, true).foreach(println)
+    }
+}
+
+object SimpleLinearRegression { 
+    def calc((Int, Double)) : {
+
+    }
+}
+
+object PostcodeBasedLinearRegression { 
     def calcMandB( vals: (Double, Double, Double, Double) ) : (Double, Double) = {
 
         vals match { case (mxs, mys, mxys, mx2s) => {
@@ -20,27 +46,13 @@ object SimpleApp {
     }
 
     def calcYs( p: (Double, Double) )  : Seq[(Int, Double)] = {
-
-        //(p: (Double, Double)) => (m * x) + b
-
         val range = 1995 until 2016
         return range.map(x => (x, (p._1 * x) + p._2)) // y = mx + b
     }
 
-    def main(args: Array[String]) {
-
-        Logger.getLogger("org").setLevel(Level.WARN)
-        Logger.getLogger("akka").setLevel(Level.WARN)
-
-        val conf = new SparkConf().setAppName("Simple Application")
-        val sc = new SparkContext(conf)
-
-        //val postcodes = sc.textFile("file:///d:/codepo_gb/Data/CSV/*.csv")
-        //val housePrices = sc.textFile("file:///d:/pp-2015.txt").cache
-
-        val housePrices = sc.textFile("./example3.txt").cache
-
-        val prices = housePrices.map(toYearsPricesAndPostcodes)
+    def run(records : org.apache.spark.rdd.RDD[String]) = {
+        
+        val prices = records.map(toYearsPricesAndPostcodes)
 
         val values = prices.mapValues(x => (x._1, x._2, x._1 * x._2, Math.pow(x._1, 2), 1))
                            .reduceByKey{ case ((xsa, ysa, xysa, x2sa, na), (xsb, ysb, xysb, x2sb, nb)) => ((xsa + xsb), (ysa + ysb), (xysa + xysb), (x2sa + x2sb), (na + nb)) }
@@ -53,7 +65,6 @@ object SimpleApp {
         values.coalesce(1, true).foreach(println)
 
         values.foreach(println)
-
 
         val count = values.count
 
@@ -87,11 +98,46 @@ object SimpleApp {
         val csvValues = percentIncrease.map{ case (p, (y2, pr1, pr2, percent)) => Array(p, y2, pr1, pr2, percent).mkString(",") }
 
         csvValues.coalesce(1, true).saveAsTextFile("output")
+    }
+
+    def toYearsPricesAndPostcodes(s: String) : ( String, (Int, Double)) = {
+        val splitted = s.split(",")
+        val price = splitted(1).replace("\"", "").toDouble
+        val year = splitted(2).replace("\"", "").substring(0, 4).toInt
+
+        val postcode = splitted(3).replace("\"", "")
+        //val postcodePrefix = splitPostcode(0) + splitPostcode(1).substring(1)
+
+        //val postcodePrefixPlusOne = 
+
+        return (postcode, (year, price))
+    }
+
+    def calcPercent(a: Double, b: Double) : Double = {
+        return ((b - a) / a) * 100
+    }    
+}
+
+object SimpleApp {
+
+    def main(args: Array[String]) {
+
+        Logger.getLogger("org").setLevel(Level.WARN)
+        Logger.getLogger("akka").setLevel(Level.WARN)
+
+        val conf = new SparkConf().setAppName("Simple Application")
+        val sc = new SparkContext(conf)
+
+        // val housePrices = sc.textFile("./example3.txt").cache
+        // PostcodeBasedLinearRegression.run(housePrices)
+
+        val housePrices = sc.textFile("./example4.txt").cache
+        RepeatSalesRegression.run(housePrices)
 
         sc.stop
     }
 
-  def toYearsPricesAndPostcodes(s: String) : ( String, (Int, Double)) = {
+    def toYearsPricesAndPostcodes(s: String) : ( String, (Int, Double)) = {
 
         val splitted = s.split(",")
         val price = splitted(1).replace("\"", "").toDouble
